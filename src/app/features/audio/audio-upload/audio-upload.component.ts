@@ -129,7 +129,7 @@ import { ReferenceDocument } from '../../../core/models/document.model';
               data-testid="existing-document-select"
             >
               <option value="">-- Select a document --</option>
-              <option *ngFor="let doc of existingDocuments" [value]="doc.id">{{ doc.name }}</option>
+              <option *ngFor="let doc of existingDocuments" [value]="doc.id">{{ doc.name + ' (' + doc.original_filename + ')' }}</option>
             </select>
           </div>
 

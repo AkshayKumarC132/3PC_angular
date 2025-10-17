@@ -21,24 +21,41 @@ import { User } from '../../core/models/user.model';
               <span class="text-gray-800 font-semibold text-xl">Platform</span>
             </div>
 
-
-
-
             <!-- Center: Nav Links -->
-            <div class="hidden sm:flex items-center space-x-6">
-              <a routerLink="/dashboard" routerLinkActive="text-indigo-600 font-semibold"
-                class="text-gray-700 hover:text-indigo-600 text-sm font-medium transition-colors">
-                Dashboard
+            <div class="hidden sm:flex items-center space-x-2">
+              <a routerLink="/dashboard"
+                routerLinkActive="text-indigo-600 bg-indigo-50"
+                [routerLinkActiveOptions]="{ exact: true }"
+                class="group inline-flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 text-sm font-medium transition">
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-500 transition"
+                    fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4a1 1 0 001-1V14a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 001 1h2a1 1 0 001-1V10" />
+                </svg>
+                <span>Dashboard</span>
               </a>
-              <a routerLink="/documents" routerLinkActive="text-indigo-600 font-semibold"
-                class="text-gray-700 hover:text-indigo-600 text-sm font-medium transition-colors">
-                Documents
+
+              <a routerLink="/documents" routerLinkActive="text-indigo-600 bg-indigo-50"
+                class="group inline-flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 text-sm font-medium transition">
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-500 transition"
+                    fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 3h6l4 4v12a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 3v4h4"/>
+                </svg>
+                <span>Documents</span>
               </a>
-              <a routerLink="/audio" routerLinkActive="text-indigo-600 font-semibold"
-                class="text-gray-700 hover:text-indigo-600 text-sm font-medium transition-colors">
-                Audio
+
+              <a routerLink="/audio" routerLinkActive="text-indigo-600 bg-indigo-50"
+                class="group inline-flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 text-sm font-medium transition">
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-500 transition"
+                    fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V7a3 3 0 116 0v8a3 3 0 11-6 0"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6"/>
+                </svg>
+                <span>Audios</span>
               </a>
             </div>
+
 
             <!-- Right: Profile -->
             <div class="relative">

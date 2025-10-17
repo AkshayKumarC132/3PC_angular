@@ -135,8 +135,8 @@ import { AudioService } from '../../../core/services/audio.service';
                     <button
                       class="p-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       (click)="runDiarization(audio.id)"
-                      [disabled]="!canRunDiarization(audio.status)"
-                      title="Run diarization"
+                      [disabled]="!canRunDiarization(audio.status) || audio.status === 'processing' || (audio.diarization !== null && audio.diarization !== 'NONE')"
+                      title="{{ audio.diarization !== null && audio.diarization !== 'NONE' ? 'Diarization exists' : 'Run diarization' }}"
                       aria-label="Run diarization"
                       [attr.data-testid]="'run-diarization-' + audio.id"
                     >

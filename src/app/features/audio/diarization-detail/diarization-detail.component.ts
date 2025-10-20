@@ -4,6 +4,26 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AudioService } from '../../../core/services/audio.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { environment } from '../../../../environments/environment';
+
+interface DownloadApiResponse {
+  processed_docx_url?: string; // primary (as per your sample)
+  url?: string;                // fallback name some backends use
+  s3_url?: string;             // another common fallback
+  filename?: string;           // preferred filename if provided
+  message?: string;
+  session_id?: string;
+  // you can keep the rest if you want to show them in UI later:
+  three_pc_entries?: Array<{
+    speaker: string;
+    start: number;
+    end: number;
+    content: string;
+    status: string;
+    reference: string | null;
+    similarity: number;
+  }>;
+}
 
 @Component({
   selector: 'app-diarization-detail',
@@ -39,10 +59,8 @@ import { AuthService } from '../../../core/services/auth.service';
           <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div class="min-w-0">
               <div class="flex items-center gap-2 mb-1">
-                <h3
-                  class="text-xl sm:text-2xl font-semibold text-gray-900 truncate"
-                  [title]="record?.original_filename"
-                >
+                <h3 class="text-xl sm:text-2xl font-semibold text-gray-900 truncate"
+                    [title]="record?.original_filename">
                   {{ record?.original_filename || '—' }}
                 </h3>
                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
@@ -53,7 +71,6 @@ import { AuthService } from '../../../core/services/auth.service';
                 </span>
               </div>
 
-              <!-- Subline: session -->
               <div class="text-xs text-gray-500" *ngIf="record?.processing_session">
                 Session: <span class="font-mono">{{ record.processing_session }}</span>
               </div>
@@ -62,40 +79,42 @@ import { AuthService } from '../../../core/services/auth.service';
             <!-- Actions -->
             <div class="flex items-center gap-2">
               <!-- Download processed -->
-              <a *ngIf="record?.processing_session"
-                 class="inline-flex items-center p-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 transition"
-                 [href]="buildDownloadUrl(record.processing_session)"
-                 target="_blank" rel="noopener"
-                 title="Download processed document"
-                 aria-label="Download processed document">
+              <button *ngIf="record?.processing_session"
+                      class="inline-flex items-center gap-2 p-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 transition disabled:opacity-60"
+                      [disabled]="downloadingProcessed"
+                      (click)="downloadProcessed(record.processing_session)"
+                      title="Download processed document"
+                      aria-label="Download processed document">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v10m0 0l-4-4m4 4l4-4M4 20h16" />
                 </svg>
-              </a>
+                <span class="min-w-[4rem]">
+                  <ng-container *ngIf="!downloadingProcessed; else procLoading">Processed</ng-container>
+                  <ng-template #procLoading>Loading…</ng-template>
+                </span>
+              </button>
 
               <!-- Download with diarization -->
-              <a *ngIf="record?.processing_session"
-                 class="inline-flex items-center p-2 rounded-md text-sm transition border"
-                 [class.border-indigo-300]="hasDiarization()"
-                 [class.text-indigo-600]="hasDiarization()"
-                 [class.hover:bg-indigo-50]="hasDiarization()"
-                 [class.border-gray-300]="!hasDiarization()"
-                 [class.text-gray-400]="!hasDiarization()"
-                 [class.pointer-events-none]="!hasDiarization()"
-                 [class.opacity-50]="!hasDiarization()"
-                 [href]="hasDiarization() ? buildDownloadWithDiarizationUrl(record.processing_session) : null"
-                 [attr.target]="hasDiarization() ? '_blank' : null"
-                 rel="noopener"
-                 [title]="hasDiarization() ? 'Download with diarization' : 'Diarization is pending'"
-                 aria-label="Download with diarization">
-                <svg class="w-5 h-5"
-                     [attr.fill]="hasDiarization() ? 'none' : 'none'"
-                     [attr.stroke]="hasDiarization() ? 'currentColor' : 'currentColor'"
-                     stroke-width="2" viewBox="0 0 24 24">
+              <button *ngIf="record?.processing_session"
+                      class="inline-flex items-center gap-2 p-2 rounded-md text-sm transition border disabled:opacity-50 disabled:cursor-not-allowed"
+                      [class.border-indigo-300]="hasDiarization()"
+                      [class.text-indigo-600]="hasDiarization()"
+                      [class.hover:bg-indigo-50]="hasDiarization()"
+                      [class.border-gray-300]="!hasDiarization()"
+                      [class.text-gray-400]="!hasDiarization()"
+                      [disabled]="!hasDiarization() || downloadingDiarized"
+                      (click)="downloadDiarized(record.processing_session)"
+                      title="Download with diarization"
+                      aria-label="Download with diarization">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round"
                         d="M7 8h10M7 12h6m5 2v6H6a2 2 0 01-2-2V6a2 2 0 012-2h8l4 4z" />
                 </svg>
-              </a>
+                <span class="min-w-[5.5rem]">
+                  <ng-container *ngIf="!downloadingDiarized; else diaLoading">Diarization</ng-container>
+                  <ng-template #diaLoading>Loading…</ng-template>
+                </span>
+              </button>
             </div>
           </div>
 
@@ -137,7 +156,7 @@ import { AuthService } from '../../../core/services/auth.service';
               </div>
             </div>
 
-            <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+            <div class="flex items-center gap-3 p-3 rounded-lg bg-purple-100 flex-1">
               <div class="h-8 w-8 rounded-md bg-purple-100 flex items-center justify-center">
                 <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
@@ -231,7 +250,6 @@ import { AuthService } from '../../../core/services/auth.service';
                       <td class="px-3 py-2 text-sm text-gray-700 align-top whitespace-nowrap">
                         {{ toTime(seg.start) }} → {{ toTime(seg.end ?? (seg.start + seg.duration)) }}
                       </td>
-                      <!-- FULL TEXT (no clamp) -->
                       <td class="px-3 py-2 text-sm text-gray-700 align-top whitespace-pre-wrap break-words">
                         {{ seg.text || '—' }}
                       </td>
@@ -256,7 +274,6 @@ import { AuthService } from '../../../core/services/auth.service';
                   title="Copy transcript"
                   aria-label="Copy transcript"
                 >
-                  <!-- Clipboard icon -->
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round"
                           d="M9 5h6a2 2 0 012 2v13a2 2 0 01-2 2H9a2 2 0 01-2-2V7a2 2 0 012-2z"/>
@@ -286,6 +303,10 @@ export class DiarizationDetailComponent implements OnInit {
   record: any;
   query = '';
   transcript = '';
+
+  // per-button loading flags
+  downloadingProcessed = false;
+  downloadingDiarized = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -317,10 +338,10 @@ export class DiarizationDetailComponent implements OnInit {
   hasDiarization(): boolean {
     const d = this.record?.diarization;
     if (!d) return false;
-    // consider segments or text as indicator of readiness
     const hasSegments = Array.isArray(d.segments) && d.segments.length > 0;
-    const hasText = typeof d === 'string' ? d.trim().length > 0 : false;
-    return hasSegments || hasText;
+    const hasText = typeof d === 'string' && d.trim().length > 0;
+    const hasTranscript = !!this.record?.transcription?.text;
+    return hasSegments || hasText || hasTranscript;
   }
 
   filteredSegments() {
@@ -392,12 +413,91 @@ export class DiarizationDetailComponent implements OnInit {
     navigator.clipboard.writeText(this.transcript).catch(() => { });
   }
 
-  // Download URLs
+  // Token helper
   private get token() { return this.auth.getToken(); }
+
+  // Download URL builders (robust)
   buildDownloadUrl(sessionId: string) {
-    return `/api/download/${this.token}/${sessionId}/`;
+    return `${environment.apiUrl}/download/${this.token}/${sessionId}/`;
   }
   buildDownloadWithDiarizationUrl(sessionId: string) {
-    return `/api/download/with-diarization/${this.token}/${sessionId}/`;
+    return `${environment.apiUrl}/download/with-diarization/${this.token}/${sessionId}/`;
+  }
+
+  // Public click handlers
+  async downloadProcessed(sessionId: string) {
+    this.errorMessage = '';
+    this.downloadingProcessed = true;
+    try {
+      const apiUrl = this.buildDownloadUrl(sessionId);
+      await this.fetchBackendThenDownload(apiUrl, `processed-${sessionId}`);
+    } catch (e: any) {
+      this.errorMessage = 'Download failed: ' + (e?.message || e);
+    } finally {
+      this.downloadingProcessed = false;
+    }
+  }
+
+  async downloadDiarized(sessionId: string) {
+    if (!this.hasDiarization()) {
+      this.errorMessage = 'Diarization not ready';
+      return;
+    }
+    this.errorMessage = '';
+    this.downloadingDiarized = true;
+    try {
+      const apiUrl = this.buildDownloadWithDiarizationUrl(sessionId);
+      await this.fetchBackendThenDownload(apiUrl, `diarized-${sessionId}`);
+    } catch (e: any) {
+      this.errorMessage = 'Download failed: ' + (e?.message || e);
+    } finally {
+      this.downloadingDiarized = false;
+    }
+  }
+
+  // Core download helper:
+  private async fetchBackendThenDownload(apiUrl: string, defaultBaseName: string) {
+    const resp = await fetch(apiUrl, {
+      // credentials: 'include', // enable if your backend relies on cookies
+    });
+    if (!resp.ok) {
+      if (resp.status === 401 || resp.status === 403) {
+        throw new Error('Unauthorized – your session/token may be invalid or expired.');
+      }
+      throw new Error(`API request failed: ${resp.status} ${resp.statusText}`);
+    }
+
+    const json = (await resp.json()) as DownloadApiResponse;
+
+    // Prefer processed_docx_url (per your response), fallback to url/s3_url
+    const s3Url = json.processed_docx_url || json.url || json.s3_url;
+    if (!s3Url) {
+      throw new Error('Server did not return a download URL');
+    }
+
+    // Prefer backend-provided filename; else derive from URL; else fallback to baseName
+    let desiredName = (json.filename || '').trim();
+    if (!desiredName) {
+      try {
+        const u = new URL(s3Url);
+        const tail = decodeURIComponent(u.pathname.split('/').pop() || '');
+        desiredName = tail || `${defaultBaseName}.pdf`;
+      } catch {
+        desiredName = `${defaultBaseName}.pdf`;
+      }
+    }
+
+    const fileResp = await fetch(s3Url);
+    if (!fileResp.ok) throw new Error(`File request failed: ${fileResp.status} ${fileResp.statusText}`);
+    const blob = await fileResp.blob();
+
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = desiredName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
   }
 }

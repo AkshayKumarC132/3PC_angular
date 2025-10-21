@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { RegisterRequest } from '../../../core/models/user.model';
 
 @Component({
   selector: 'app-register',
@@ -73,22 +74,6 @@ import { AuthService } from '../../../core/services/auth.service';
           </div>
         </div>
 
-        <div class="mb-6">
-          <label class="block text-gray-700 text-sm font-bold mb-2" for="role">
-            Role
-          </label>
-          <select
-            id="role"
-            formControlName="role"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            data-testid="register-role-select"
-          >
-            <option value="user">User</option>
-            <option value="reviewer">Reviewer</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-
         <button
           type="submit"
           [disabled]="registerForm.invalid || loading"
@@ -124,8 +109,7 @@ export class RegisterComponent {
     this.registerForm = this.fb.group({
       name: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(6)]],
-      role: ['user', Validators.required]
+      password: ['', [Validators.required, Validators.minLength(6)]]
     });
   }
 
@@ -135,7 +119,19 @@ export class RegisterComponent {
       this.errorMessage = '';
       this.successMessage = '';
 
-      this.authService.register(this.registerForm.value).subscribe({
+      const { name, email, password } = this.registerForm.value as {
+        name: string;
+        email: string;
+        password: string;
+      };
+      const registerData: RegisterRequest = {
+        name,
+        email,
+        password,
+        role: 'admin'
+      };
+
+      this.authService.register(registerData).subscribe({
         next: (response) => {
           this.loading = false;
           this.successMessage = 'Registration successful! Redirecting to login...';

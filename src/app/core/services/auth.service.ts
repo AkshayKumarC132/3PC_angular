@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { ApiService } from './api.service';
 import { User, LoginRequest, LoginResponse, RegisterRequest, AuthState } from '../models/user.model';
@@ -14,7 +15,27 @@ export class AuthService {
 
   public authState$ = this.authStateSubject.asObservable();
 
-  constructor(private apiService: ApiService) { }
+  private invalidatingSessionSubject = new BehaviorSubject<boolean>(false);
+  public invalidatingSession$ = this.invalidatingSessionSubject.asObservable();
+
+  constructor(
+    private apiService: ApiService,
+    private router: Router
+  ) {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event: StorageEvent) => {
+        if (event.key === null || event.key === this.TOKEN_KEY || event.key === this.USER_KEY) {
+          const token = localStorage.getItem(this.TOKEN_KEY);
+          const user = this.getStoredUser();
+          this.authStateSubject.next({
+            user,
+            token,
+            isAuthenticated: !!token
+          });
+        }
+      });
+    }
+  }
 
   private restoreAuthState(): AuthState {
     const token = localStorage.getItem(this.TOKEN_KEY);
@@ -131,5 +152,26 @@ export class AuthService {
 
   private clearAuthState(): void {
     this.setAuthState(null, null);
+  }
+
+  handleInvalidToken(message = 'Your session has expired. Please log in again.'): void {
+    if (this.invalidatingSessionSubject.value) {
+      return;
+    }
+
+    this.invalidatingSessionSubject.next(true);
+    this.clearAuthState();
+
+    const queryParams: Record<string, string> = {
+      sessionExpired: '1',
+      sessionMessage: message
+    };
+
+    void this.router.navigate(['/login'], {
+      queryParams,
+      replaceUrl: true
+    }).finally(() => {
+      setTimeout(() => this.invalidatingSessionSubject.next(false), 400);
+    });
   }
 }

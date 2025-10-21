@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-login',
@@ -12,7 +13,20 @@ import { AuthService } from '../../../core/services/auth.service';
     <div class="bg-white rounded-lg shadow-xl p-8">
       <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Welcome Back</h2>
       
-      <div *ngIf="errorMessage" class="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+      <div
+        *ngIf="sessionMessage"
+        class="mb-4 flex items-start gap-3 rounded border border-indigo-200 bg-indigo-50 p-3 text-indigo-700"
+      >
+        <svg class="h-5 w-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div class="space-y-1">
+          <p class="font-medium">Session ended</p>
+          <p class="text-sm leading-relaxed">{{ sessionMessage }}</p>
+        </div>
+      </div>
+
+      <div *ngIf="errorMessage" class="mb-4 rounded border border-red-400 bg-red-100 p-3 text-red-700">
         {{ errorMessage }}
       </div>
 
@@ -73,11 +87,13 @@ import { AuthService } from '../../../core/services/auth.service';
   `,
   styles: []
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, OnDestroy {
   loginForm: FormGroup;
   loading = false;
   errorMessage = '';
   returnUrl = '';
+  sessionMessage = '';
+  private subscription = new Subscription();
 
   constructor(
     private fb: FormBuilder,
@@ -92,7 +108,27 @@ export class LoginComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
+    this.subscription.add(
+      this.route.queryParamMap.subscribe(params => {
+        this.returnUrl = params.get('returnUrl') || '/dashboard';
+
+        const sessionExpired = params.get('sessionExpired');
+        const message = params.get('sessionMessage');
+        if (sessionExpired === '1') {
+          this.sessionMessage = message || 'For your security we signed you out. Please log in again to continue.';
+
+          void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: {
+              sessionExpired: null,
+              sessionMessage: null
+            },
+            queryParamsHandling: 'merge',
+            replaceUrl: true
+          });
+        }
+      })
+    );
   }
 
   onSubmit() {
@@ -103,6 +139,7 @@ export class LoginComponent implements OnInit {
       this.authService.login(this.loginForm.value).subscribe({
         next: (response) => {
           this.loading = false;
+          this.sessionMessage = '';
           this.router.navigate([this.returnUrl]);
         },
         error: (error) => {
@@ -111,5 +148,9 @@ export class LoginComponent implements OnInit {
         }
       });
     }
+  }
+
+  ngOnDestroy(): void {
+    this.subscription.unsubscribe();
   }
 }

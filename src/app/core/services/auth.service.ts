@@ -7,29 +7,60 @@ import { User, LoginRequest, LoginResponse, RegisterRequest, AuthState } from '.
   providedIn: 'root'
 })
 export class AuthService {
-  private authState = new BehaviorSubject<AuthState>({
-    user: null,
-    token: null,
-    isAuthenticated: false
-  });
+  private readonly TOKEN_KEY = 'auth_token';
+  private readonly USER_KEY = 'user';
 
-  public authState$ = this.authState.asObservable();
+  private authStateSubject = new BehaviorSubject<AuthState>(this.restoreAuthState());
 
-  constructor(private apiService: ApiService) {
-    this.loadAuthState();
+  public authState$ = this.authStateSubject.asObservable();
+
+  constructor(private apiService: ApiService) { }
+
+  private restoreAuthState(): AuthState {
+    const token = localStorage.getItem(this.TOKEN_KEY);
+    const user = this.getStoredUser();
+
+    return {
+      user,
+      token,
+      isAuthenticated: !!token
+    };
   }
 
-  private loadAuthState(): void {
-    const token = localStorage.getItem('auth_token');
-    const user = localStorage.getItem('user');
-    
-    if (token && user) {
-      this.authState.next({
-        user: JSON.parse(user),
-        token: token,
-        isAuthenticated: true
-      });
+  private getStoredUser(): User | null {
+    const storedUser = localStorage.getItem(this.USER_KEY);
+
+    if (!storedUser) {
+      return null;
     }
+
+    try {
+      return JSON.parse(storedUser) as User;
+    } catch (error) {
+      console.warn('Failed to parse stored user data. Clearing corrupted value.', error);
+      localStorage.removeItem(this.USER_KEY);
+      return null;
+    }
+  }
+
+  private setAuthState(user: User | null, token: string | null): void {
+    if (token) {
+      localStorage.setItem(this.TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(this.TOKEN_KEY);
+    }
+
+    if (user) {
+      localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(this.USER_KEY);
+    }
+
+    this.authStateSubject.next({
+      user,
+      token,
+      isAuthenticated: !!token
+    });
   }
 
   register(data: RegisterRequest): Observable<any> {
@@ -39,14 +70,8 @@ export class AuthService {
   login(credentials: LoginRequest): Observable<LoginResponse> {
     return this.apiService.post<LoginResponse>('/login/', credentials).pipe(
       tap(response => {
-        if (response.token && response.data) {
-          localStorage.setItem('auth_token', response.token);
-          localStorage.setItem('user', JSON.stringify(response.data));
-          this.authState.next({
-            user: response.data,
-            token: response.token,
-            isAuthenticated: true
-          });
+        if (response.token) {
+          this.setAuthState(response.data ?? null, response.token);
         }
       })
     );
@@ -70,27 +95,33 @@ export class AuthService {
     const token = this.getToken();
     return this.apiService.put<User>(`/profile/${token}/`, data).pipe(
       tap(user => {
-        localStorage.setItem('user', JSON.stringify(user));
-        const currentState = this.authState.value;
-        this.authState.next({
-          ...currentState,
-          user: user
-        });
+        this.setAuthState(user, this.authStateSubject.value.token);
       })
     );
   }
 
   getToken(): string | null {
-    return localStorage.getItem('auth_token');
+    return this.authStateSubject.value.token ?? localStorage.getItem(this.TOKEN_KEY);
   }
 
   getUser(): User | null {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    const currentUser = this.authStateSubject.value.user;
+    return currentUser ?? this.getStoredUser();
   }
 
   isAuthenticated(): boolean {
-    return this.authState.value.isAuthenticated;
+    const { isAuthenticated } = this.authStateSubject.value;
+    if (isAuthenticated) {
+      return true;
+    }
+
+    const token = localStorage.getItem(this.TOKEN_KEY);
+    if (token) {
+      this.setAuthState(this.getStoredUser(), token);
+      return true;
+    }
+
+    return false;
   }
 
   isAdmin(): boolean {
@@ -99,12 +130,6 @@ export class AuthService {
   }
 
   private clearAuthState(): void {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
-    this.authState.next({
-      user: null,
-      token: null,
-      isAuthenticated: false
-    });
+    this.setAuthState(null, null);
   }
 }

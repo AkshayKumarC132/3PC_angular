@@ -18,6 +18,9 @@ export class AuthService {
   private invalidatingSessionSubject = new BehaviorSubject<boolean>(false);
   public invalidatingSession$ = this.invalidatingSessionSubject.asObservable();
 
+  private invalidationMessageSubject = new BehaviorSubject<string>('');
+  public invalidationMessage$ = this.invalidationMessageSubject.asObservable();
+
   constructor(
     private apiService: ApiService,
     private router: Router
@@ -25,13 +28,19 @@ export class AuthService {
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (event: StorageEvent) => {
         if (event.key === null || event.key === this.TOKEN_KEY || event.key === this.USER_KEY) {
+          const hadActiveSession = this.authStateSubject.value.isAuthenticated;
           const token = localStorage.getItem(this.TOKEN_KEY);
           const user = this.getStoredUser();
+
           this.authStateSubject.next({
             user,
             token,
             isAuthenticated: !!token
           });
+
+          if (hadActiveSession && !token) {
+            this.handleInvalidToken('You have been signed out in another tab. Please log in again.');
+          }
         }
       });
     }
@@ -167,11 +176,16 @@ export class AuthService {
       sessionMessage: message
     };
 
+    this.invalidationMessageSubject.next(message);
+
     void this.router.navigate(['/login'], {
       queryParams,
       replaceUrl: true
     }).finally(() => {
-      setTimeout(() => this.invalidatingSessionSubject.next(false), 400);
+      setTimeout(() => {
+        this.invalidatingSessionSubject.next(false);
+        this.invalidationMessageSubject.next('');
+      }, 400);
     });
   }
 }

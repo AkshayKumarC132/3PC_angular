@@ -10,14 +10,13 @@ import { Observable } from 'rxjs';
   imports: [CommonModule, RouterOutlet],
   template: `
     <div class="min-h-screen">
-      <div
-        *ngIf="invalidating$ | async"
-        class="session-overlay"
-      >
+      <div *ngIf="invalidating$ | async" class="session-overlay">
         <div class="session-overlay__card">
           <span class="session-overlay__spinner"></span>
-          <p class="session-overlay__title">Refreshing your session</p>
-          <p class="session-overlay__subtitle">Taking you back to the login page…</p>
+          <p class="session-overlay__title">Signing you out securely…</p>
+          <p class="session-overlay__subtitle">
+            {{ (invalidationMessage$ | async) || 'We’ll have you back at the login page in a moment.' }}
+          </p>
         </div>
       </div>
 
@@ -29,8 +28,10 @@ import { Observable } from 'rxjs';
 export class AppComponent {
   title = '3PC Platform';
   invalidating$: Observable<boolean>;
+  invalidationMessage$: Observable<string>;
 
   constructor(private authService: AuthService) {
     this.invalidating$ = this.authService.invalidatingSession$;
+    this.invalidationMessage$ = this.authService.invalidationMessage$;
   }
 }

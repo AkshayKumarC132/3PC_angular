@@ -7,7 +7,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const token = authService.getToken();
 
-  const shouldAttachToken = token && !req.url.includes('/login') && !req.url.includes('/register');
+  const isAuthEndpoint = req.url.includes('/login') || req.url.includes('/register');
+  const shouldAttachToken = token && !isAuthEndpoint;
+  const expectsAuthenticatedSession = !isAuthEndpoint;
   const requestToSend = shouldAttachToken
     ? req.clone({
         setHeaders: {
@@ -18,7 +20,24 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(requestToSend).pipe(
     catchError((error: HttpErrorResponse) => {
-      const lowerMessage = (error.error?.detail || error.error?.message || error.message || '')
+      const serverMessage = ((): string => {
+        if (!error.error) {
+          return '';
+        }
+
+        if (typeof error.error === 'string') {
+          return error.error;
+        }
+
+        return (
+          error.error?.detail ||
+          error.error?.message ||
+          error.error?.error ||
+          ''
+        ) as string;
+      })();
+
+      const lowerMessage = `${serverMessage} ${error.message || ''}`
         .toString()
         .toLowerCase();
 
@@ -30,15 +49,15 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         lowerMessage.includes('token') || lowerMessage.includes('credentials') || lowerMessage.includes('authorization');
 
       const shouldForceLogout =
-        !!token && (
+        expectsAuthenticatedSession && (
           error.status === 401 ||
           (error.status === 403 && mentionsTokenOrCredentials) ||
           messageHintsInvalidToken
         );
 
       if (shouldForceLogout) {
-        const rawMessage = (error.error?.detail || error.error?.message || error.message || '').toString();
-        const displayMessage = rawMessage.trim() || 'Your session is no longer valid. Please sign in again.';
+        const rawMessage = serverMessage || error.message || '';
+        const displayMessage = rawMessage.toString().trim() || 'Your session is no longer valid. Please sign in again.';
         authService.handleInvalidToken(displayMessage);
       }
 

@@ -4,11 +4,48 @@ import { RouterModule } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 import { DashboardService } from '../../core/services/dashboard.service';
 
+type ActivityAction =
+  | 'document_upload'
+  | 'audio_upload'
+  | 'audio_processed'
+  | 'diarization_started'
+  | 'diarization_completed'
+  | string;
+
+interface ActivityUser {
+  id: number;
+  email: string;
+  name: string;
+  theme: string;
+  role: string;
+  date_joined: string;   // ISO
+  last_login: string;    // ISO
+}
+
+interface ActivityDetails {
+  document_type?: string;
+  original_filename?: string;
+  file_size?: number;
+  source?: string;
+  [key: string]: any;
+}
+
+interface RecentActivityItem {
+  id: number;
+  action: ActivityAction;
+  user: ActivityUser;
+  timestamp: string;     // ISO
+  object_id: string;
+  object_type: string;
+  details?: ActivityDetails;
+}
+
 interface DashboardSummary {
   total_documents: number;
   total_audio_files: number;
   processed_audio: number;
   pending_diarization: number;
+  recent_activity?: RecentActivityItem[];
 }
 
 @Component({
@@ -56,32 +93,26 @@ interface DashboardSummary {
           </div>
         </div>
 
-        <!-- Processed Audios (updated label + icon) -->
+        <!-- Processed Audios -->
         <div class="bg-white rounded-lg shadow-md p-6">
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm font-medium text-gray-600">Processed Audios</p>
               <p class="text-2xl font-bold text-purple-600">{{ summary?.processed_audio || 0 }}</p>
             </div>
-            <!-- Check-circle icon for "processed/completed" -->
             <svg class="w-12 h-12 text-purple-200" fill="currentColor" viewBox="0 0 24 24">
-              <path
-                fill-rule="evenodd"
-                d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm-1.293 13.293-3-3a1 1 0 1 1 1.414-1.414L11 12.586l4.879-4.879a1 1 0 1 1 1.414 1.414l-5.586 5.586a1 1 0 0 1-1.414 0Z"
-                clip-rule="evenodd"
-              />
+              <path fill-rule="evenodd" d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm-1.293 13.293-3-3a1 1 0 1 1 1.414-1.414L11 12.586l4.879-4.879a1 1 0 1 1 1.414 1.414l-5.586 5.586a1 1 0 0 1-1.414 0Z" clip-rule="evenodd"/>
             </svg>
           </div>
         </div>
 
-        <!-- Pending Diarization (updated icon) -->
+        <!-- Pending Diarization -->
         <div class="bg-white rounded-lg shadow-md p-6">
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm font-medium text-gray-600">Pending Diarization</p>
               <p class="text-2xl font-bold text-blue-600">{{ summary?.pending_diarization || 0 }}</p>
             </div>
-            <!-- Clock icon for "pending/in progress" -->
             <svg class="w-12 h-12 text-blue-200" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 1.75a10.25 10.25 0 1 0 10.25 10.25A10.262 10.262 0 0 0 12 1.75Zm0 18.5A8.25 8.25 0 1 1 20.25 12 8.26 8.26 0 0 1 12 20.25Z"/>
               <path d="M12.75 7.75a.75.75 0 0 0-1.5 0v4.19l-2.47 2.47a.75.75 0 1 0 1.06 1.06l2.91-2.91a.75.75 0 0 0 .22-.53Z"/>
@@ -130,7 +161,9 @@ interface DashboardSummary {
         <!-- Recent Activity -->
         <div class="bg-white rounded-lg shadow-md p-6">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-          <div class="space-y-4">
+
+          <!-- Empty state -->
+          <div *ngIf="(summary?.recent_activity || []).length === 0" class="space-y-4">
             <div class="flex items-start">
               <div class="flex-shrink-0">
                 <div class="w-2 h-2 mt-2 bg-indigo-600 rounded-full"></div>
@@ -141,6 +174,35 @@ interface DashboardSummary {
               </div>
             </div>
           </div>
+
+          <!-- List -->
+          <ul *ngIf="(summary?.recent_activity || []).length > 0" class="divide-y divide-gray-100">
+            <li *ngFor="let item of summary?.recent_activity | slice:0:8" class="py-3">
+              <div class="flex items-start">
+                <div class="flex-shrink-0 mt-1">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center"
+                       [ngClass]="iconBg(item.action)">
+                    <svg class="w-4 h-4" fill="currentColor" [attr.viewBox]="iconViewBox(item.action)">
+                      <path [attr.d]="iconPath(item.action)"></path>
+                    </svg>
+                  </div>
+                </div>
+
+                <div class="ml-3 flex-1 min-w-0">
+                  <p class="text-sm text-gray-900">
+                    {{ primaryLine(item) }}
+                  </p>
+                  <p class="text-xs text-gray-500">
+                    {{ secondaryLine(item) }}
+                  </p>
+                </div>
+
+                <div class="ml-3 text-xs text-gray-400 whitespace-nowrap">
+                  {{ item.timestamp | date:'medium' }}
+                </div>
+              </div>
+            </li>
+          </ul>
         </div>
       </div>
     </div>
@@ -152,7 +214,7 @@ export class DashboardComponent implements OnInit {
   loading = false;
   errorMessage = '';
 
-  constructor(private dashboardService: DashboardService) {}
+  constructor(private dashboardService: DashboardService) { }
 
   ngOnInit() {
     this.loadDashboardSummary();
@@ -160,7 +222,6 @@ export class DashboardComponent implements OnInit {
 
   private loadDashboardSummary() {
     this.loading = true;
-
     this.dashboardService.getSummary()
       .pipe(finalize(() => (this.loading = false)))
       .subscribe({
@@ -172,5 +233,71 @@ export class DashboardComponent implements OnInit {
           this.errorMessage = 'Failed to load dashboard summary';
         }
       });
+  }
+
+  // ---------- Activity rendering helpers ----------
+
+  primaryLine(a: RecentActivityItem): string {
+    // Main line: action + filename (if present)
+    const filename = a.details?.original_filename;
+    switch (a.action) {
+      case 'document_upload':
+        return `Document uploaded${filename ? `: ${filename}` : ''}`;
+      case 'audio_upload':
+        return `Audio uploaded${filename ? `: ${filename}` : ''}`;
+      case 'audio_processed':
+        return `Audio processed${filename ? `: ${filename}` : ''}`;
+      case 'diarization_started':
+        return `Diarization started`;
+      case 'diarization_completed':
+        return `Diarization completed`;
+      default:
+        return this.titleCase(a.action.replace(/_/g, ' '));
+    }
+  }
+
+  secondaryLine(a: RecentActivityItem): string {
+    // Secondary line: who + object type
+    const who = a.user?.name || a.user?.email || 'Unknown user';
+    const what = a.object_type || 'Object';
+    const type = a.details?.document_type ? ` • ${a.details?.document_type.toUpperCase()}` : '';
+    return `${who} • ${what}${type}`;
+  }
+
+  titleCase(s: string): string {
+    return s.replace(/\w\S*/g, (t) => t[0].toUpperCase() + t.slice(1).toLowerCase());
+  }
+
+  // Simple icon mapping
+  iconPath(action: ActivityAction): string {
+    switch (action) {
+      case 'document_upload':       // document icon
+        return 'M9 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V6.414A2 2 0 0 0 16.414 5L14 2.586A2 2 0 0 0 12.586 2H9z M3 8a2 2 0 0 1 2-2v10h8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z';
+      case 'audio_upload':          // volume/waves icon
+        return 'M3 10v4a1 1 0 0 0 1 1h2l3 3V6L6 9H4a1 1 0 0 0-1 1zm11-6a1 1 0 0 1 1 1 7 7 0 0 1 0 14 1 1 0 1 1 0-2 5 5 0 0 0 0-10 1 1 0 0 1-1-1z';
+      case 'audio_processed':       // check circle
+      case 'diarization_completed':
+        return 'M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm-1.293 13.293-3-3a1 1 0 1 1 1.414-1.414L11 12.586l4.879-4.879a1 1 0 1 1 1.414 1.414l-5.586 5.586a1 1 0 0 1-1.414 0Z';
+      case 'diarization_started':   // clock
+        return 'M12 1.75a10.25 10.25 0 1 0 10.25 10.25A10.262 10.262 0 0 0 12 1.75Zm.75 6a.75.75 0 1 0-1.5 0v4.19l-2.47 2.47a.75.75 0 1 0 1.06 1.06l2.91-2.91a.75.75 0 0 0 .22-.53Z';
+      default:                      // dot
+        return 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z';
+    }
+  }
+
+  iconViewBox(_action: ActivityAction): string {
+    // Most paths here fit 24x24; keep consistent
+    return '0 0 24 24';
+  }
+
+  iconBg(action: ActivityAction): string {
+    switch (action) {
+      case 'document_upload': return 'bg-indigo-100 text-indigo-600';
+      case 'audio_upload': return 'bg-green-100 text-green-600';
+      case 'audio_processed': return 'bg-purple-100 text-purple-600';
+      case 'diarization_started': return 'bg-amber-100 text-amber-600';
+      case 'diarization_completed': return 'bg-blue-100 text-blue-600';
+      default: return 'bg-gray-100 text-gray-600';
+    }
   }
 }

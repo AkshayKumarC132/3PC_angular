@@ -10,10 +10,9 @@ interface DownloadApiResponse {
   processed_docx_url?: string; // primary (as per your sample)
   url?: string;                // fallback name some backends use
   s3_url?: string;             // another common fallback
-  filename?: string;           // preferred filename if provided
+  filename?: string;           // preferred filename if provided (used server-side via Content-Disposition)
   message?: string;
   session_id?: string;
-  // you can keep the rest if you want to show them in UI later:
   three_pc_entries?: Array<{
     speaker: string;
     start: number;
@@ -135,7 +134,7 @@ interface DownloadApiResponse {
             <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
               <div class="h-8 w-8 rounded-md bg-blue-100 flex items-center justify-center">
                 <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 20l9-5-9-5-9 5 9 5z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 20l9-5-9-5-9 5z" />
                 </svg>
               </div>
               <div class="min-w-0">
@@ -455,11 +454,14 @@ export class DiarizationDetailComponent implements OnInit {
     }
   }
 
-  // Core download helper:
-  private async fetchBackendThenDownload(apiUrl: string, defaultBaseName: string) {
-    const resp = await fetch(apiUrl, {
-      // credentials: 'include', // enable if your backend relies on cookies
-    });
+  /**
+   * Core download helper (Option A):
+   * - Call backend to get a pre-signed S3/CloudFront URL
+   * - Navigate to that URL (no CORS required)
+   * - Filename is controlled server-side via Content-Disposition on the signed URL
+   */
+  private async fetchBackendThenDownload(apiUrl: string, _defaultBaseName: string) {
+    const resp = await fetch(apiUrl);
     if (!resp.ok) {
       if (resp.status === 401 || resp.status === 403) {
         throw new Error('Unauthorized – your session/token may be invalid or expired.');
@@ -468,36 +470,21 @@ export class DiarizationDetailComponent implements OnInit {
     }
 
     const json = (await resp.json()) as DownloadApiResponse;
-
-    // Prefer processed_docx_url (per your response), fallback to url/s3_url
     const s3Url = json.processed_docx_url || json.url || json.s3_url;
     if (!s3Url) {
       throw new Error('Server did not return a download URL');
     }
 
-    // Prefer backend-provided filename; else derive from URL; else fallback to baseName
-    let desiredName = (json.filename || '').trim();
-    if (!desiredName) {
-      try {
-        const u = new URL(s3Url);
-        const tail = decodeURIComponent(u.pathname.split('/').pop() || '');
-        desiredName = tail || `${defaultBaseName}.pdf`;
-      } catch {
-        desiredName = `${defaultBaseName}.pdf`;
-      }
-    }
-
-    const fileResp = await fetch(s3Url);
-    if (!fileResp.ok) throw new Error(`File request failed: ${fileResp.status} ${fileResp.statusText}`);
-    const blob = await fileResp.blob();
-
-    const blobUrl = URL.createObjectURL(blob);
+    // trigger download by navigating to the pre-signed URL
+    // a.download is ignored cross-origin unless your backend sets Content-Disposition on the signed URL
     const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = desiredName;
+    a.href = s3Url;
+    a.rel = 'noopener';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(blobUrl);
+
+    // optional Safari fallback if pop-up blocking interferes:
+    // try { window.open(s3Url, '_blank', 'noopener'); } catch {}
   }
 }

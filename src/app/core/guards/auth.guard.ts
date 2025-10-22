@@ -25,3 +25,15 @@ export const adminGuard: CanActivateFn = (route, state) => {
   router.navigate(['/']);
   return false;
 };
+
+export const redirectIfAuthenticatedGuard: CanActivateFn = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (authService.isAuthenticated()) {
+    return router.createUrlTree(['/dashboard']);
+  }
+
+  return true;
+};
+

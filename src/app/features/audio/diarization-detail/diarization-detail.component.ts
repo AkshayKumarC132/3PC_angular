@@ -257,8 +257,61 @@ interface DownloadApiResponse {
                 </table>
               </div>
 
-              <div *ngIf="!record?.diarization?.segments?.length" class="text-sm text-gray-500 mt-4">
-                No segments found.
+              <div *ngIf="!record?.diarization?.segments?.length" class="text-center py-8">
+                <!-- Pending -->
+                <div *ngIf="record?.diarization_status === 'pending'" class="flex flex-col items-center gap-3">
+                  <div class="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Diarization Queued</p>
+                    <p class="text-xs text-gray-500 mt-1">Processing will begin shortly</p>
+                  </div>
+                </div>
+
+                <!-- Processing -->
+                <div *ngIf="record?.diarization_status === 'processing'" class="flex flex-col items-center gap-3">
+                  <div class="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Processing Diarization</p>
+                    <p class="text-xs text-gray-500 mt-1">This may take a few minutes</p>
+                  </div>
+                </div>
+
+                <!-- Failed -->
+                <div *ngIf="record?.diarization_status === 'failed'" class="flex flex-col items-center gap-3">
+                  <div class="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Diarization Failed</p>
+                    <p class="text-xs text-gray-500 mt-1">Please try running diarization again from the audio list</p>
+                  </div>
+                </div>
+
+                <!-- Not Started / Completed but no segments -->
+                <div *ngIf="!record?.diarization_status || (record?.diarization_status === 'completed' && !record?.diarization?.segments?.length)" class="flex flex-col items-center gap-3">
+                  <div class="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">No Segments Available</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                      <span *ngIf="!record?.diarization_status">Run diarization from the audio list to generate speaker segments</span>
+                      <span *ngIf="record?.diarization_status === 'completed'">Diarization completed but no segments were found</span>
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 

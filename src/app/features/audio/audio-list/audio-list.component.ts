@@ -105,8 +105,8 @@ import { AudioService } from '../../../core/services/audio.service';
                 <!-- Actions: icon buttons -->
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
                   <div class="inline-flex items-center gap-2">
-                    <!-- View (eye) -->
-                    <button
+                    <!-- View (eye) - Show if completed -->
+                    <button *ngIf="audio.diarization_status === 'completed'"
                       class="p-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100"
                       (click)="viewDiarization(audio.id)"
                       title="View diarization"
@@ -118,25 +118,32 @@ import { AudioService } from '../../../core/services/audio.service';
                       </svg>
                     </button>
 
-                    <!-- Speakers (users) -->
-                    <!-- <a
-                      class="p-2 rounded-md border border-green-200 text-green-700 bg-green-50 hover:bg-green-100"
-                      [routerLink]="['/audio/speaker-mapping', audio.id]"
-                      title="Speaker mapping"
-                      aria-label="Speaker mapping"
-                      [attr.data-testid]="'speaker-mapping-' + audio.id"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M7 7a4 4 0 1 1 8 0 4 4 0 0 1-8 0Zm10 4a3 3 0 1 0-2.83-4h-.34A6 6 0 1 0 5 13.9V16a2 2 0 0 0 2 2h5.26A7 7 0 0 1 17 11Z"/>
+                    <!-- Processing (spinner) - Show if processing -->
+                    <div *ngIf="audio.diarization_status === 'processing'" 
+                         class="p-2" 
+                         title="Diarization processing">
+                      <svg class="animate-spin h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                    </a> -->
+                    </div>
 
-                    <!-- Run (play) -->
-                    <button
+                    <!-- Pending (clock) - Show if pending -->
+                    <div *ngIf="audio.diarization_status === 'pending'" 
+                         class="p-2 text-yellow-600" 
+                         title="Diarization pending">
+                       <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </div>
+
+                    <!-- Run (play) - Show if failed or none -->
+                    <button *ngIf="!audio.diarization_status || audio.diarization_status === 'failed'"
                       class="p-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       (click)="runDiarization(audio.id)"
-                      [disabled]="!canRunDiarization(audio.status) || audio.status === 'processing' || (audio.diarization !== null && audio.diarization !== 'NONE')"
-                      title="{{ audio.diarization !== null && audio.diarization !== 'NONE' ? 'Diarization exists' : 'Run diarization' }}"
+                      [disabled]="!canRunDiarization(audio.status)"
+                      [title]="audio.diarization_status === 'failed' ? 'Retry diarization' : 'Run diarization'"
                       aria-label="Run diarization"
                       [attr.data-testid]="'run-diarization-' + audio.id"
                     >

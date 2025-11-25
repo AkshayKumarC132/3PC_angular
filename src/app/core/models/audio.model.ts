@@ -2,6 +2,7 @@ export interface AudioFile {
   id: string;
   original_filename: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
+  diarization_status?: 'pending' | 'processing' | 'completed' | 'failed';
   duration?: number;
   coverage?: number;
   created_at: string;
